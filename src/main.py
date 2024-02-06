@@ -1,0 +1,168 @@
+import os
+
+import socket
+import threading
+import datetime
+import logging
+
+import numpy as np
+
+import acquisition
+
+from utils import log
+from pylsl import StreamInlet, resolve_stream
+
+from utils.std import mkdir
+
+#def eeg_format_convert(data):
+#    return np.transpose(data)
+
+def get_ch_names_LSL(inlet):
+
+    ch_names = list()
+
+    info = inlet.info()
+    ch = info.desc().child("channels").child("channel")
+    for k in range(info.channel_count()):
+        ch_names.append(ch.child_value('label'))
+        ch = ch.next_sibling()
+    
+    return ch_names
+
+def main(name_marker_stream,
+         channels,
+         markers,
+         tmin,
+         tmax,
+         filter_freq,
+         filter_order,
+         markers_new_trial,
+         markers_end_trial):
+
+    logger = logging.getLogger(__name__)
+
+    logger.debug("channels for acquisition: %s"%str(channels))
+
+    # ------------------------------------------------------------------------------------------------
+    # find/connect eeg outlet
+    # first resolve an EEG stream on the lab network
+    logger.debug("looking for an EEG stream...")
+    eeg_streams = resolve_stream('type', 'EEG')
+
+    # create a new inlet to read from the stream
+    eeg_inlet = StreamInlet(eeg_streams[0], recover = True)
+    fs = eeg_streams[0].nominal_srate()
+    ch_names = get_ch_names_LSL(eeg_inlet)
+    logger.debug("ch_names_LSL : %s" %str(ch_names))
+    
+    for ch in channels:
+        if not ch in ch_names:
+            logger.error("channel '%s' is not in LSL EEG stream."%(ch))
+
+    channels_to_acquire = list()
+    for idx, ch in enumerate(ch_names):
+        if ch in channels:
+            channels_to_acquire.append(idx)
+    channels_to_acquire = np.array(channels_to_acquire)
+    logger.debug("channels_to_acquire (idx) : %s" %str(channels_to_acquire))
+    logger.debug("channels_to_acquire : %s" %str(np.array(ch_names)[channels_to_acquire]))
+
+    n_ch = len(channels_to_acquire)
+    logger.debug("n_ch for online session : %d" %n_ch)
+
+    # ------------------------------------------------------------------------------------------------
+    # find/connect marker outlet
+
+    logger.debug("looking for a marker stream...")
+    is_searching_marker_stream = True
+    while is_searching_marker_stream:
+        marker_stream = resolve_stream('type', 'Markers')
+        for idx, stream in enumerate(marker_stream):
+            if name_marker_stream in stream.name():
+                marker_inlet = StreamInlet(marker_stream[idx], recover=True)
+                logger.debug("Marker Stream : %s" %marker_stream[idx].name())
+                is_searching_marker_stream = False
+                
+
+    logger.debug("Configuration was Done.")  
+    
+    epochs = acquisition.Epochs(n_ch,
+                                fs,
+                                markers,
+                                tmin,
+                                tmax,
+                                baseline=None,
+                                ch_names = channels,
+                                ch_types = 'eeg')
+    
+    acq = acquisition.OnlineDataAcquire(epochs,
+                                        eeg_inlet,
+                                        channels_to_acquire,
+                                        n_ch,
+                                        fs,
+                                        marker_inlet,
+                                        filter_freq,
+                                        filter_order,
+                                        new_trial_markers = markers_new_trial,
+                                        end_markers = markers_end_trial)
+    
+    acq.start()
+    
+    m = 0
+    import time
+    while True:
+        #logger.debug("main : %d"%m)
+        #time.sleep(5)
+        m += 1
+        #print(acq.is_got_new_trial_marker()) 
+        if acq.is_got_new_trial_marker():
+            print("main: new trial has started")
+            while True:
+                time.sleep(3)
+                #logger.debug("epochs.has_new_data(): %s"%str(epochs.has_new_data()))
+                if epochs.has_new_data():
+                    epochs_data, events = epochs.get_new_data()
+                    logger.debug("epochs for events '%s' was load."%(str(events)))
+                    logger.debug("epochs.shape: %s"%(str(epochs_data.shape)))
+                    #print(epochs_data)
+                    #print(event)
+                if acq.is_trial_end():
+                    #epochs.clear()
+                    logger.debug("main: trial was end.")
+                    #time.sleep(3)
+                    logger.debug("ready for next trial.")
+                    break
+
+
+        #print(epochs.has_new_data())
+    
+
+
+if __name__ == "__main__":
+
+    import conf
+    log_dir = os.path.join(os.path.expanduser('~'), "log", "lsl-epoching")
+
+    log_strftime = "%y-%m-%d"
+    datestr =  datetime.datetime.now().strftime(log_strftime) 
+    log_fname = "%s.log"%datestr
+    
+    print(log_dir)
+
+    mkdir(log_dir)
+    if os.path.exists(os.path.join(conf.log_dir, log_fname)):
+        os.remove(os.path.join(conf.log_dir, log_fname))
+    log.set_logger(os.path.join(log_dir, log_fname), True)
+    
+    marker_stream_name = "MyMarkerStream"
+    channels = ["F3", "Fz", "F4", "C3", "Cz", "C4", "P3", "Pz", "P4"]
+
+    main(name_marker_stream = marker_stream_name, 
+         channels = channels,
+         markers = conf.markers_to_epoch,
+         tmin = -0.1,
+         tmax = 1,
+         filter_freq = [1, 40],
+         filter_order = 2,
+         markers_new_trial = conf.markers['new-trial'],
+         markers_end_trial = conf.markers['end'])
