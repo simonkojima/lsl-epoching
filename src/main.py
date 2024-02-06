@@ -4,6 +4,7 @@ import socket
 import threading
 import datetime
 import logging
+import json
 
 import numpy as np
 
@@ -29,7 +30,9 @@ def get_ch_names_LSL(inlet):
     
     return ch_names
 
-def main(name_marker_stream,
+def main(sock,
+         length_header,
+         name_marker_stream,
          channels,
          markers,
          tmin,
@@ -115,13 +118,30 @@ def main(name_marker_stream,
         #time.sleep(5)
         m += 1
         #print(acq.is_got_new_trial_marker()) 
-        if acq.is_got_new_trial_marker():
+        new_trial = acq.is_got_new_trial_marker()
+        if new_trial:
+            json_data = dict()
+            json_data['type'] = 'info'
+            json_data['info'] = 'new-trial'
+            json_data['data'] = new_trial
+
+            sock.send(len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header))
+            sock.send(json.dumps(json_data).encode('utf-8'))
+
             print("main: new trial has started")
             while True:
-                time.sleep(3)
+                #time.sleep(3)
                 #logger.debug("epochs.has_new_data(): %s"%str(epochs.has_new_data()))
                 if epochs.has_new_data():
                     epochs_data, events = epochs.get_new_data()
+                    json_data = dict()
+                    json_data['type'] = 'epochs' 
+                    json_data['epochs'] = epochs_data.tolist()
+                    json_data['events'] = events
+
+                    sock.send(len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header))
+                    sock.send(json.dumps(json_data).encode('utf-8'))
+
                     logger.debug("epochs for events '%s' was load."%(str(events)))
                     logger.debug("epochs.shape: %s"%(str(epochs_data.shape)))
                     #print(epochs_data)
@@ -154,11 +174,29 @@ if __name__ == "__main__":
         os.remove(os.path.join(conf.log_dir, log_fname))
     log.set_logger(os.path.join(log_dir, log_fname), True)
     
-    marker_stream_name = "MyMarkerStream"
-    channels = ["F3", "Fz", "F4", "C3", "Cz", "C4", "P3", "Pz", "P4"]
+    logger = logging.getLogger(__name__)
+    logger.debug("ip address: %s"%str(conf.ip_address))
+    logger.debug("port: %s"%str(conf.port))
 
-    main(name_marker_stream = marker_stream_name, 
-         channels = channels,
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((conf.ip_address, conf.port))
+    print("server info. ip: %s, port: %s"%(str(conf.ip_address), str(conf.port)))
+    
+    server.settimeout(10)
+    try:
+        server.listen()
+        print("waiting for connection...")
+        conn, addr = server.accept()
+        print("connected : %s" %str(addr))
+    except:
+        exit()
+
+
+
+    main(sock = conn,
+         length_header=conf.length_header,
+         name_marker_stream = conf.marker_stream_name, 
+         channels = conf.channels,
          markers = conf.markers_to_epoch,
          tmin = -0.1,
          tmax = 1,

@@ -42,10 +42,13 @@ def start():
 
 print("[STARTING] server is starting...")
 try:
-    server.settimeout(3)
+    server.settimeout(10)
     server.listen()
-    print("here")
+    print("waiting...")
     server.accept()
+    print("cl_1 was connected")
+    server.accept()
+    print("cl_2 was connected")
     #start()
 except:
     exit()
