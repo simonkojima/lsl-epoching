@@ -30,7 +30,22 @@ def get_ch_names_LSL(inlet):
     
     return ch_names
 
-def main(sock,
+def conns_send(conns, data):
+    logger = logging.getLogger(__name__)
+    idx_conn_remove = list()
+    for idx, conn in enumerate(conns):
+        try:
+            conn.send(data)
+        except Exception as e:
+            #logger.debug("")
+            idx_conn_remove.append(idx)
+    if len(idx_conn_remove) != 0:
+        for m in sorted(idx_conn_remove, reverse=True):
+            conns.pop(m)
+        logger.debug("some lost connection was closed.")
+
+
+def main(conns,
          length_header,
          name_marker_stream,
          name_eeg_stream,
@@ -130,9 +145,8 @@ def main(sock,
             json_data['type'] = 'info'
             json_data['info'] = 'new-trial'
             json_data['data'] = new_trial
-
-            sock.send(len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
-            sock.send(json.dumps(json_data).encode('utf-8'))
+            conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
+            conns_send(conns, json.dumps(json_data).encode('utf-8'))
 
             print("main: new trial has started")
             while True:
@@ -145,8 +159,8 @@ def main(sock,
                     json_data['epochs'] = epochs_data.tolist()
                     json_data['events'] = events
 
-                    sock.send(len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
-                    sock.send(json.dumps(json_data).encode('utf-8'))
+                    conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
+                    conns_send(conns, json.dumps(json_data).encode('utf-8'))
 
                     logger.debug("epochs for events '%s' was load."%(str(events)))
                     logger.debug("epochs.shape: %s"%(str(epochs_data.shape)))
@@ -154,6 +168,11 @@ def main(sock,
                     #print(event)
                 if acq.is_trial_end():
                     #epochs.clear()
+                    json_data = dict()
+                    json_data['type'] = 'info'
+                    json_data['info'] = 'end-trial'
+                    conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
+                    conns_send(conns, json.dumps(json_data).encode('utf-8'))
                     logger.debug("main: trial was end.")
                     #time.sleep(3)
                     logger.debug("ready for next trial.")
@@ -162,6 +181,21 @@ def main(sock,
 
         #print(epochs.has_new_data())
     
+def server(ip, port, conns):
+    logger = logging.getLogger(__name__)
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((conf.ip_address, conf.port))
+    print("server info. ip: %s, port: %s"%(str(conf.ip_address), str(conf.port)))
+    
+    #server.settimeout(10)
+    while True:
+        server.listen()
+        conn, addr = server.accept()
+        conns.append(conn)
+        #print("connected : %s" %str(addr))
+        logger.debug("New socket connection was established. '%s'"%str(addr))
+
 
 
 if __name__ == "__main__":
@@ -183,23 +217,12 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     logger.debug("ip address: %s"%str(conf.ip_address))
     logger.debug("port: %s"%str(conf.port))
-
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((conf.ip_address, conf.port))
-    print("server info. ip: %s, port: %s"%(str(conf.ip_address), str(conf.port)))
     
-    server.settimeout(10)
-    try:
-        server.listen()
-        print("waiting for connection...")
-        conn, addr = server.accept()
-        print("connected : %s" %str(addr))
-    except:
-        exit()
-
-
-
-    main(sock = conn,
+    conns = list()
+    thread = threading.Thread(target=server, args=(conf.ip_address, conf.port, conns))
+    thread.start()
+    
+    main(conns = conns,
          length_header=conf.length_header,
          name_marker_stream = conf.name_marker_stream, 
          name_eeg_stream = conf.name_eeg_stream,

@@ -37,7 +37,11 @@ while True:
         events.append(msg_json['events'])
         json_save['epochs'] = epochs
         json_save['events'] = events
-        pyerp.utils.save_json(os.path.join(json_save_dir, "oddball.json"), json_save)
+        #pyerp.utils.save_json(os.path.join(json_save_dir, "oddball.json"), json_save)
+        
+    if msg_json['type'] == 'info':
+        if msg_json['info'] == 'end-trial':
+            pyerp.utils.save_json(os.path.join(json_save_dir, "oddball.json"), json_save)
         
     
         
