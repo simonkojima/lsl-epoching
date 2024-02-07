@@ -36,6 +36,7 @@ class OnlineDataAcquire(object):
         self.eeg_inlet = eeg_inlet
         self.nch_eeg = nch_eeg
         self.fs_eeg = fs_eeg
+        self.z = None
         self.marker_inlet = marker_inlet
         self.filter_freq = filter_freq
         self.filter_order = filter_order
@@ -81,7 +82,7 @@ class OnlineDataAcquire(object):
         # online filter
         if self.filter_freq is not None:
             sos = signal.butter(self.filter_order, np.array(self.filter_freq)/(self.fs_eeg/2), 'bandpass', output='sos')
-            z = np.zeros((self.filter_order, self.nch_eeg, 2))
+            self.z = np.zeros((self.filter_order, self.nch_eeg, 2))
             # Shape of initial Z should be (filter_order, number_of_eeg_channel, 2)
             # or
             # z = signal.sosfilt_zi(sos) # shape of the returned object will be (filter_order, 2)
@@ -113,13 +114,15 @@ class OnlineDataAcquire(object):
                         break
 
                 if eeg.time_chunk:                
-                    for idx in range(len(eeg.time_chunk)):
-                        eeg.time_chunk[idx] += eeg.time_correction
+                    #for idx in range(len(eeg.time_chunk)):
+                    #    eeg.time_chunk[idx] += eeg.time_correction
+                    
                     eeg.data_chunk = np.array(eeg.data_chunk) # has shape of (n_samples, n_ch)
                     eeg.data_chunk = np.transpose(eeg.data_chunk) # now it's shape of (n_ch, n_samples)
                     #eeg.data_chunk = self.format_convert_eeg_func(eeg.data_chunk)
                     eeg.data_chunk = eeg.data_chunk[self.channels_to_acquire, :]
-                    eeg.data_chunk, z = signal.sosfilt(sos, eeg.data_chunk, axis=1, zi=z)
+                    if self.filter_freq is not None:
+                        eeg.data_chunk, self.z = signal.sosfilt(sos, eeg.data_chunk, axis=1, zi=self.z)
                     time_start = time.perf_counter()
                     eeg.data = np.concatenate((eeg.data, eeg.data_chunk), axis=1)
                     time_end = time.perf_counter()
@@ -155,8 +158,8 @@ class OnlineDataAcquire(object):
                     
 
                 if marker.time_chunk:
-                    for idx in range(len(marker.time_chunk)):
-                        marker.time_chunk[idx] += marker.time_correction
+                    #for idx in range(len(marker.time_chunk)):
+                    #    marker.time_chunk[idx] += marker.time_correction
                     #print(marker.data_chunk)
                     #exit()
                     #marker.data_chunk = self.format_convert_marker_func(marker.data_chunk)

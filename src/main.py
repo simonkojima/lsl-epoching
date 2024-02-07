@@ -11,7 +11,7 @@ import numpy as np
 import acquisition
 
 from utils import log
-from pylsl import StreamInlet, resolve_stream
+from pylsl import StreamInlet, resolve_stream, resolve_streams
 
 from utils.std import mkdir
 
@@ -33,6 +33,7 @@ def get_ch_names_LSL(inlet):
 def main(sock,
          length_header,
          name_marker_stream,
+         name_eeg_stream,
          channels,
          markers,
          tmin,
@@ -48,13 +49,18 @@ def main(sock,
 
     # ------------------------------------------------------------------------------------------------
     # find/connect eeg outlet
-    # first resolve an EEG stream on the lab network
     logger.debug("looking for an EEG stream...")
-    eeg_streams = resolve_stream('type', 'EEG')
+    is_searching = True
+    while is_searching:
+        streams = resolve_streams(wait_time = 1)
+        for stream in streams:
+            if stream.name() == name_eeg_stream:
+                eeg_inlet = StreamInlet(stream, recover = True)
+                fs = stream.nominal_srate()
+                logger.debug("EEG Stream : %s" %stream.name())
+                is_searching = False
 
     # create a new inlet to read from the stream
-    eeg_inlet = StreamInlet(eeg_streams[0], recover = True)
-    fs = eeg_streams[0].nominal_srate()
     ch_names = get_ch_names_LSL(eeg_inlet)
     logger.debug("ch_names_LSL : %s" %str(ch_names))
     
@@ -77,15 +83,15 @@ def main(sock,
     # find/connect marker outlet
 
     logger.debug("looking for a marker stream...")
-    is_searching_marker_stream = True
-    while is_searching_marker_stream:
-        marker_stream = resolve_stream('type', 'Markers')
-        for idx, stream in enumerate(marker_stream):
-            if name_marker_stream in stream.name():
-                marker_inlet = StreamInlet(marker_stream[idx], recover=True)
-                logger.debug("Marker Stream : %s" %marker_stream[idx].name())
-                is_searching_marker_stream = False
-                
+    
+    is_searching = True
+    while is_searching:
+        streams = resolve_streams(wait_time = 1)
+        for stream in streams:
+            if stream.name() == name_marker_stream:
+                marker_inlet = StreamInlet(stream, recover = True)
+                logger.debug("Marker Stream : %s" %stream.name())
+                is_searching = False
 
     logger.debug("Configuration was Done.")  
     
@@ -125,7 +131,7 @@ def main(sock,
             json_data['info'] = 'new-trial'
             json_data['data'] = new_trial
 
-            sock.send(len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header))
+            sock.send(len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
             sock.send(json.dumps(json_data).encode('utf-8'))
 
             print("main: new trial has started")
@@ -139,7 +145,7 @@ def main(sock,
                     json_data['epochs'] = epochs_data.tolist()
                     json_data['events'] = events
 
-                    sock.send(len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header))
+                    sock.send(len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
                     sock.send(json.dumps(json_data).encode('utf-8'))
 
                     logger.debug("epochs for events '%s' was load."%(str(events)))
@@ -195,12 +201,14 @@ if __name__ == "__main__":
 
     main(sock = conn,
          length_header=conf.length_header,
-         name_marker_stream = conf.marker_stream_name, 
+         name_marker_stream = conf.name_marker_stream, 
+         name_eeg_stream = conf.name_eeg_stream,
          channels = conf.channels,
          markers = conf.markers_to_epoch,
          tmin = -0.1,
          tmax = 1,
-         filter_freq = [1, 40],
+         #filter_freq = [1, 40],
+         filter_freq = None,
          filter_order = 2,
          markers_new_trial = conf.markers['new-trial'],
          markers_end_trial = conf.markers['end'])
