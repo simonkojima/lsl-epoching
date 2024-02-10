@@ -2,6 +2,7 @@ import sys
 import time
 import traceback
 import threading
+import copy
 from logging import getLogger
 import numpy as np
 from scipy import signal
@@ -299,13 +300,12 @@ class Epochs():
 
         # check if the marker can be epoched
         for idx, time_marker in enumerate(self.marker.time):
-            if (self.eeg.time[-1] > (time_marker + self.tmax)) and ((idx in self.epoched_idx) is False):
+            #eeg_end_time = self.eeg.time[-1]
+            if (self.eeg.time[-1] > (time_marker + self.tmax + 5/self.fs)) and ((idx in self.epoched_idx) is False):
                 idx_start = int(np.argmin(np.absolute(self.eeg.time - (time_marker + self.tmin))))
                 idx_end = int(idx_start + self.length_epoch)
+                #idx_end = idx_start + self.length_epoch
                 if (idx_end - idx_start) != self.length_epoch:
-                    print("idx_end: %s"%(str(idx_end)))
-                    print("idx_start: %s"%(str(idx_start)))
-                    print("length_epoch: %s"%(str(self.length_epoch)))
                     raise ValueError("length_epoch is invalid")
                 self.epochs[idx] = self.eeg.data[:, idx_start:idx_end]
                 self.events[idx] = self.marker.data[idx]
@@ -330,25 +330,18 @@ class Epochs():
         if self.has_new_data() == False:
             return None
         else:
-            #epochs_new = self.data.__getitem__(idx)
-            #logger.debug("get new data, data : %s" %(str(self.epochs)))
-            #logger.debug("get new data, idx : %s" %str(self.new_epochs_idx))
-            #logger.debug("get new data, events : %s" %(str(self.events.shape)))
-
-            #epochs_new = self.data[idx,:,:]
-            #events = self.events[idx,2]
-            ##epochs_new = self.data[idx]
-            #self.new_data[idx] = 0
-            #return epochs_new, events
+            
+            # sometimes, new epoch is recorded, and self.new_epochs_idx have new index data
+            # in for loop below. To prevent this, copy the object.
+            new_epochs_idx = copy.copy(self.new_epochs_idx)
 
             events_new = list()
-            epochs_new = np.zeros((len(self.new_epochs_idx), self.n_ch, self.length_epoch))
-            for idx, idx_epochs in enumerate(self.new_epochs_idx):
+            epochs_new = np.zeros((len(new_epochs_idx), self.n_ch, self.length_epoch))
+            for idx, idx_epochs in enumerate(new_epochs_idx):
                 epochs_new[idx, :, :] = self.epochs[idx_epochs]
                 events_new.append(self.events[idx_epochs])
-            #print(epochs_new)
-            #epochs_new = np.array(epochs_new)    
             
-            self.new_epochs_idx = list()
+            for idx_epochs in new_epochs_idx:
+                self.new_epochs_idx.remove(idx_epochs)
 
             return epochs_new, events_new
