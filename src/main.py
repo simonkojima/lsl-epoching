@@ -139,12 +139,12 @@ def main(conns,
         #time.sleep(5)
         m += 1
         #print(acq.is_got_new_trial_marker()) 
-        new_trial = acq.is_got_new_trial_marker()
-        if new_trial:
+        marker_new_trial = acq.is_got_new_trial_marker()
+        if marker_new_trial:
             json_data = dict()
             json_data['type'] = 'info'
-            json_data['info'] = 'new-trial'
-            json_data['data'] = new_trial
+            json_data['info'] = 'trial-start'
+            json_data['data'] = marker_new_trial
             conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
             conns_send(conns, json.dumps(json_data).encode('utf-8'))
 
@@ -170,7 +170,7 @@ def main(conns,
                     #epochs.clear()
                     json_data = dict()
                     json_data['type'] = 'info'
-                    json_data['info'] = 'end-trial'
+                    json_data['info'] = 'trial-end'
                     conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
                     conns_send(conns, json.dumps(json_data).encode('utf-8'))
                     logger.debug("main: trial was end.")
@@ -233,5 +233,5 @@ if __name__ == "__main__":
          #filter_freq = [1, 40],
          filter_freq = None,
          filter_order = 2,
-         markers_new_trial = conf.markers['new-trial'],
-         markers_end_trial = conf.markers['end'])
+         markers_new_trial = conf.markers['trial-start'],
+         markers_end_trial = conf.markers['trial-end'])
