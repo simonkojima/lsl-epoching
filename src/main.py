@@ -245,8 +245,8 @@ if __name__ == "__main__":
          markers = conf.markers_to_epoch,
          tmin = -0.1,
          tmax = 1,
-         #filter_freq = [1, 40],
-         filter_freq = None,
+         filter_freq = [1, 40],
+         #filter_freq = None,
          filter_order = 2,
          markers_new_trial = conf.markers['trial-start'],
          markers_end_trial = conf.markers['trial-end'])

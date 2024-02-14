@@ -8,7 +8,7 @@ length_header = 64
 log_dir = os.path.join(os.path.expanduser('~'), "log", "lsl-epoching")
     
 name_marker_stream = "scab-c"
-name_eeg_stream = "jarvis-erp"
+name_eeg_stream = "BrainAmpSeries"
 
 icom_clients = None
 
