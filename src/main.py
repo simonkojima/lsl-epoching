@@ -8,6 +8,8 @@ import json
 
 import numpy as np
 
+import pyicom as icom
+
 import acquisition
 
 from utils import log
@@ -45,7 +47,8 @@ def conns_send(conns, data):
         logger.debug("some lost connection was closed.")
 
 
-def main(conns,
+def main(icom_server,
+         icom_clients,
          length_header,
          name_marker_stream,
          name_eeg_stream,
@@ -145,8 +148,10 @@ def main(conns,
             json_data['type'] = 'info'
             json_data['info'] = 'trial-start'
             json_data['data'] = marker_new_trial
-            conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
-            conns_send(conns, json.dumps(json_data).encode('utf-8'))
+            #server.send(data = json_data.encode('utf-8'))
+            server.send(data = json.dumps(json_data).encode('utf-8'))
+            #conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
+            #conns_send(conns, json.dumps(json_data).encode('utf-8'))
 
             print("main: new trial has started")
             while True:
@@ -159,8 +164,11 @@ def main(conns,
                     json_data['epochs'] = epochs_data.tolist()
                     json_data['events'] = events
 
-                    conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
-                    conns_send(conns, json.dumps(json_data).encode('utf-8'))
+                    #conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
+                    #conns_send(conns, json.dumps(json_data).encode('utf-8'))
+
+                    #server.send(data = json_data.encode('utf-8'))
+                    server.send(data = json.dumps(json_data).encode('utf-8'))
 
                     logger.debug("epochs for events '%s' was load."%(str(events)))
                     logger.debug("epochs.shape: %s"%(str(epochs_data.shape)))
@@ -171,8 +179,10 @@ def main(conns,
                     json_data = dict()
                     json_data['type'] = 'info'
                     json_data['info'] = 'trial-end'
-                    conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
-                    conns_send(conns, json.dumps(json_data).encode('utf-8'))
+                    server.send(data = json.dumps(json_data).encode('utf-8'))
+                    #server.send(data = json_data.encode('utf-8'))
+                    #conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
+                    #conns_send(conns, json.dumps(json_data).encode('utf-8'))
                     logger.debug("main: trial was end.")
                     #time.sleep(3)
                     logger.debug("ready for next trial.")
@@ -218,11 +228,16 @@ if __name__ == "__main__":
     logger.debug("ip address: %s"%str(conf.ip_address))
     logger.debug("port: %s"%str(conf.port))
     
-    conns = list()
-    thread = threading.Thread(target=server, args=(conf.ip_address, conf.port, conns))
-    thread.start()
+    #conns = list()
+    #thread = threading.Thread(target=server, args=(conf.ip_address, conf.port, conns))
+    #thread.start()
     
-    main(conns = conns,
+    server = icom.server(ip = conf.ip_address,
+                         port = conf.port)
+    server.start()
+    
+    main(icom_server=server,
+         icom_clients=conf.icom_clients,
          length_header=conf.length_header,
          name_marker_stream = conf.name_marker_stream, 
          name_eeg_stream = conf.name_eeg_stream,
