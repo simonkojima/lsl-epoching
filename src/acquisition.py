@@ -115,79 +115,11 @@ class OnlineDataAcquire(object):
                         break
 
                 if eeg.time_chunk:                
-                    #for idx in range(len(eeg.time_chunk)):
-                    #    eeg.time_chunk[idx] += eeg.time_correction
-                    
-                    eeg.data_chunk = np.array(eeg.data_chunk) # has shape of (n_samples, n_ch)
-                    eeg.data_chunk = np.transpose(eeg.data_chunk) # now it's shape of (n_ch, n_samples)
-                    #eeg.data_chunk = self.format_convert_eeg_func(eeg.data_chunk)
-                    eeg.data_chunk = eeg.data_chunk[self.channels_to_acquire, :]
-                    if self.filter_freq is not None:
-                        eeg.data_chunk, self.z = signal.sosfilt(sos, eeg.data_chunk, axis=1, zi=self.z)
-                    time_start = time.perf_counter()
-                    eeg.data = np.concatenate((eeg.data, eeg.data_chunk), axis=1)
-                    time_end = time.perf_counter()
-                    #logger.debug("concanating eeg.data and eeg.data_chunk took %.5f seconds"%(time_end - time_start))
-                    eeg.time = np.append(eeg.time, eeg.time_chunk)
-                    #eeg.time_chunk = list()
-                    
                     self.epochs.update()
-
-                    if self.got_end_marker:
-                        #pass
-                        #if len(self.epochs.epoched_marker) == sum(self.epochs.epoched_marker):
-                        if (self.epochs.n_markers == self.epochs.n_epoched) and (self.epochs.has_new_data() is False):
-                            logger.debug("%d / %d epochs in trial was acquired. The trial was end."%(self.epochs.n_epoched, self.epochs.n_markers))
-
-                            # clear eeg and marker cache after the end of the trial.
-                            eeg.data = np.empty((self.nch_eeg, 0))
-                            eeg.time = np.array([])
-                            marker.data = np.empty((0), dtype=np.int64)
-                            marker.time = np.array([])
-
-                            self.epochs.set(eeg, marker) # initialize epochs
-                            self.epochs.clear()
-                            #self.epochs.data = None
-                            #self.epochs.event = None
-                            #self.new_data = np.array([], dtype=np.int64)
-                            #self.epochs.update()
-                            self.got_end_marker = False
-                            self.trial_was_end = True
-
-                            # if want to close this thread, do follows
-                            #self.is_running = False
                     
 
                 if marker.time_chunk:
-                    #for idx in range(len(marker.time_chunk)):
-                    #    marker.time_chunk[idx] += marker.time_correction
-                    #print(marker.data_chunk)
-                    #exit()
-                    #marker.data_chunk = self.format_convert_marker_func(marker.data_chunk)
                     logger.debug("markers '%s' was recieved"%str(marker.data_chunk))
-
-                    #marker.data_chunk = np.array(marker.data_chunk)
-
-                    #print(marker.data_chunk)
-                    #print(marker.data_chunk.index('206'))
-                    #print(marker.time_chunk)
-                    if self.new_trial_markers is not None:
-                        for new_trial_marker in  self.new_trial_markers:
-                            if new_trial_marker in np.array(marker.data_chunk):
-                                self.got_new_trial_marker = new_trial_marker
-                                logger.debug("new trial has started")
-                    if self.end_markers is not None:
-                        for end_marker in self.end_markers:
-                            if end_marker in np.array(marker.data_chunk):
-                                self.got_end_marker = True
-                                logger.debug("trial was over")
-
-                    time_start = time.perf_counter()
-                    marker.data = np.append(marker.data, marker.data_chunk)
-                    marker.time = np.append(marker.time, marker.time_chunk)
-                    time_end = time.perf_counter()
-                    #logger.debug("concanating marker and marker.chunk took %.5f seconds"%(time_end - time_start))
-
                     self.epochs.update()
         except:
             logger.error("Error : \n%s" %(traceback.format_exc()))
