@@ -50,6 +50,7 @@ def conns_send(conns, data):
 def main(icom_server,
          icom_clients,
          length_header,
+         length_buffer,
          name_marker_stream,
          name_eeg_stream,
          channels,
@@ -59,9 +60,13 @@ def main(icom_server,
          filter_freq,
          filter_order,
          markers_new_trial,
-         markers_end_trial):
+         markers_end_trial,
+         data_dir,
+         data_fname):
 
     logger = logging.getLogger(__name__)
+    mkdir(data_dir)
+    file_data = open(os.path.join(data_dir, data_fname), 'w')
 
     logger.debug("channels for acquisition: %s"%str(channels))
 
@@ -120,11 +125,14 @@ def main(icom_server,
                                 tmax,
                                 baseline=None,
                                 ch_names = channels,
-                                ch_types = 'eeg')
+                                ch_types = 'eeg',
+                                file_data=file_data,
+                                icom_server=icom_server)
     
     acq = acquisition.OnlineDataAcquire(epochs,
                                         eeg_inlet,
                                         channels_to_acquire,
+                                        length_buffer,
                                         n_ch,
                                         fs,
                                         marker_inlet,
@@ -135,62 +143,22 @@ def main(icom_server,
     
     acq.start()
     
-    m = 0
     import time
     while True:
-        #logger.debug("main : %d"%m)
-        #time.sleep(5)
-        m += 1
-        #print(acq.is_got_new_trial_marker()) 
-        marker_new_trial = acq.is_got_new_trial_marker()
-        if marker_new_trial:
-            json_data = dict()
-            json_data['type'] = 'info'
-            json_data['info'] = 'trial-start'
-            json_data['data'] = marker_new_trial
-            #server.send(data = json_data.encode('utf-8'))
-            server.send(data = json.dumps(json_data).encode('utf-8'))
-            #conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
-            #conns_send(conns, json.dumps(json_data).encode('utf-8'))
-
-            print("main: new trial has started")
-            while True:
-                #time.sleep(3)
-                #logger.debug("epochs.has_new_data(): %s"%str(epochs.has_new_data()))
-                if epochs.has_new_data():
-                    epochs_data, events = epochs.get_new_data()
-                    json_data = dict()
-                    json_data['type'] = 'epochs' 
-                    json_data['epochs'] = epochs_data.tolist()
-                    json_data['events'] = events
-
-                    #conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
-                    #conns_send(conns, json.dumps(json_data).encode('utf-8'))
-
-                    #server.send(data = json_data.encode('utf-8'))
-                    server.send(data = json.dumps(json_data).encode('utf-8'))
-
-                    logger.debug("epochs for events '%s' was load."%(str(events)))
-                    logger.debug("epochs.shape: %s"%(str(epochs_data.shape)))
-                    #print(epochs_data)
-                    #print(event)
-                if acq.is_trial_end():
-                    #epochs.clear()
-                    json_data = dict()
-                    json_data['type'] = 'info'
-                    json_data['info'] = 'trial-end'
-                    server.send(data = json.dumps(json_data).encode('utf-8'))
-                    #server.send(data = json_data.encode('utf-8'))
-                    #conns_send(conns, len(json.dumps(json_data).encode('utf-8')).to_bytes(length_header, byteorder='little'))
-                    #conns_send(conns, json.dumps(json_data).encode('utf-8'))
-                    logger.debug("main: trial was end.")
-                    #time.sleep(3)
-                    logger.debug("ready for next trial.")
-                    break
-
-
-        #print(epochs.has_new_data())
+        time.sleep(1)
+        try:
+            pass
+        except KeyboardInterrupt:
+            break
+        #json_data = dict()
+        #@json_data['type'] = 'info'
+        #json_data['info'] = 'trial-start'
+        #json_data['data'] = marker_new_trial
+        #server.send(data = json.dumps(json_data).encode('utf-8'))
+    file_data.close()
+    print("terminate")
     
+"""
 def server(ip, port, conns):
     logger = logging.getLogger(__name__)
 
@@ -205,7 +173,7 @@ def server(ip, port, conns):
         conns.append(conn)
         #print("connected : %s" %str(addr))
         logger.debug("New socket connection was established. '%s'"%str(addr))
-
+"""
 
 
 if __name__ == "__main__":
@@ -243,10 +211,13 @@ if __name__ == "__main__":
          name_eeg_stream = conf.name_eeg_stream,
          channels = conf.channels,
          markers = conf.markers_to_epoch,
+         length_buffer=conf.length_buffer,
          tmin = -0.1,
          tmax = 1,
          filter_freq = [1, 40],
          #filter_freq = None,
          filter_order = 2,
          markers_new_trial = conf.markers['trial-start'],
-         markers_end_trial = conf.markers['trial-end'])
+         markers_end_trial = conf.markers['trial-end'],
+         data_dir=conf.data_dir,
+         data_fname=conf.data_fname)

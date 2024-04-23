@@ -6,6 +6,8 @@ port = 49153
 length_header = 64
 
 log_dir = os.path.join(os.path.expanduser('~'), "log", "lsl-epoching")
+data_dir = os.path.join(os.path.expanduser('~'), "Documents", "eeg", "epochs")
+data_fname = "epochs.txt"
     
 name_marker_stream = "scab-c"
 #name_eeg_stream = "BrainAmpSeries"
@@ -27,6 +29,12 @@ markers['trial-end'] = ['255']
 #markers['nontarget'] = ['1']
 #markers['end'] = ['255']
 
-markers_to_epoch = markers['nontarget'] + markers['target']
+#markers_to_epoch = markers['nontarget'] + markers['target']
+markers_to_epoch = list()
+for m in range(1, 200):
+    markers_to_epoch.append(str(m))
 
 #markers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '101', '102', '103', '104', '105', '106', '107', '108', '109']
+
+# length of the buffer in seconds
+length_buffer = 10

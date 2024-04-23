@@ -3,6 +3,7 @@ import time
 import traceback
 import threading
 import copy
+import json
 from logging import getLogger
 import numpy as np
 from scipy import signal
@@ -22,6 +23,7 @@ class OnlineDataAcquire(object):
             epochs,
             eeg_inlet,
             channels_to_acquire,
+            length_buffer = 10,
             nch_eeg=None,
             fs_eeg=None,
             marker_inlet=None,
@@ -43,6 +45,8 @@ class OnlineDataAcquire(object):
         self.filter_order = filter_order
         self.format_convert_eeg_func = format_convert_eeg_func
         self.format_convert_marker_func = format_convert_marker_func
+        
+        self.length_buffer = length_buffer
 
         self.channels_to_acquire = channels_to_acquire
         if type(channels_to_acquire) == list:
@@ -67,8 +71,8 @@ class OnlineDataAcquire(object):
     def start(self):
         logger = getLogger(__name__)
         logger.debug("Online Data Acquire module was started.")
-        self.thread = threading.Thread(target=self.main_thread)
         self.is_running = True
+        self.thread = threading.Thread(target=self.main_thread)
         self.thread.start()
 
     def stop(self):
@@ -87,6 +91,7 @@ class OnlineDataAcquire(object):
             # Shape of initial Z should be (filter_order, number_of_eeg_channel, 2)
             # or
             # z = signal.sosfilt_zi(sos) # shape of the returned object will be (filter_order, 2)
+            logger.debug("Filter cofficients were derived.")
 
         # ------------------------------------------------------------------------------------------------
 
@@ -114,12 +119,49 @@ class OnlineDataAcquire(object):
                         logger.error("Error : \n%s" %(traceback.format_exc()))
                         break
 
-                if eeg.time_chunk:                
+                if eeg.time_chunk:
+                    
+                    # has shape of (n_samples, n_ch)
+                    eeg.data_chunk = np.array(eeg.data_chunk) 
+
+                    # now it's shape of (n_ch, n_samples)
+                    eeg.data_chunk = np.transpose(eeg.data_chunk) 
+
+                    # pick selected channels
+                    eeg.data_chunk = eeg.data_chunk[self.channels_to_acquire, :]
+
+                    # apply filter
+                    if self.filter_freq is not None:
+                        eeg.data_chunk, self.z = signal.sosfilt(sos, eeg.data_chunk, axis=1, zi=self.z)
+
+                    # concatenate data
+                    time_start = time.perf_counter()
+                    eeg.data = np.concatenate((eeg.data, eeg.data_chunk), axis=1)
+                    time_end = time.perf_counter()
+                    #logger.debug("concanating eeg.data and eeg.data_chunk took %.5f seconds"%(time_end - time_start))
+
+                    # append time
+                    eeg.time = np.append(eeg.time, eeg.time_chunk)       
+
                     self.epochs.update()
                     
+                    # keep the buffer size
+                    _, Ns = eeg.data.shape
+                    if Ns > self.length_buffer*self.fs_eeg:
+                        eeg.data = eeg.data[:, int(Ns-(self.length_buffer*self.fs_eeg)):Ns]
+                        eeg.time = eeg.time[int(Ns-(self.length_buffer*self.fs_eeg)):Ns]
+                        
+
 
                 if marker.time_chunk:
                     logger.debug("markers '%s' was recieved"%str(marker.data_chunk))
+
+                    # append marker data and time info
+                    time_start = time.perf_counter()
+                    marker.data = np.append(marker.data, marker.data_chunk)
+                    marker.time = np.append(marker.time, marker.time_chunk)
+                    time_end = time.perf_counter()
+                    
                     self.epochs.update()
         except:
             logger.error("Error : \n%s" %(traceback.format_exc()))
@@ -144,7 +186,7 @@ class OnlineDataAcquire(object):
         
 
 class Epochs():
-    def __init__(self, n_ch, fs, markers_to_epoch, tmin, tmax, baseline=None, ch_names=None, ch_types='eeg'):
+    def __init__(self, n_ch, fs, markers_to_epoch, tmin, tmax, baseline=None, ch_names=None, ch_types='eeg', file_data=None, icom_server=None):
         """
         Parameters
         ----------
@@ -171,6 +213,9 @@ class Epochs():
         else:
             self.ch_names = ch_names
         #self.info = mne.create_info(self.ch_names, self.fs, ch_types=self.ch_types)
+        
+        self.file_data = file_data
+        self.icom_server = icom_server
 
         self.length_epoch = np.floor(fs*(self.range_epoch[1]-self.range_epoch[0])).astype(np.int64)+1
         
@@ -213,11 +258,11 @@ class Epochs():
         logger = getLogger(__name__)
         #time.sleep(0.1)
 
-        if self.marker.data.size == 0:
+        #if self.marker.data.size == 0:
+            # doesn't have any marker sometimes when it's updated with new eeg data
             # don't process if there's no markers received.
-            return
+        #    return
         
-
         # check if the marker is in the self.markers_to_epoch
         idx_to_delete = list()
         for idx, val in enumerate(np.unique(self.marker.data)):
@@ -228,21 +273,25 @@ class Epochs():
         self.marker.data = np.delete(self.marker.data, idx_to_delete)
         self.marker.time = np.delete(self.marker.time, idx_to_delete)
         
-        self.n_markers = len(self.marker.time)
+        #self.n_markers = len(self.marker.time)
 
         # check if the marker can be epoched
         for idx, time_marker in enumerate(self.marker.time):
-            #eeg_end_time = self.eeg.time[-1]
             if (self.eeg.time[-1] > (time_marker + self.tmax + 5/self.fs)) and ((idx in self.epoched_idx) is False):
                 idx_start = int(np.argmin(np.absolute(self.eeg.time - (time_marker + self.tmin))))
                 idx_end = int(idx_start + self.length_epoch)
-                #idx_end = idx_start + self.length_epoch
-                if (idx_end - idx_start) != self.length_epoch:
-                    raise ValueError("length_epoch is invalid")
+                #if (idx_end - idx_start) != self.length_epoch:
+                #    raise ValueError("length_epoch is invalid")
                 self.epochs[idx] = self.eeg.data[:, idx_start:idx_end]
                 self.events[idx] = self.marker.data[idx]
+                json_data = json.dumps({'type':'epochs', 'events':self.events[idx].tolist(), 'epochs':self.epochs[idx].tolist()})
+                if self.file_data is not None:
+                    self.file_data.write(json_data)
+                if self.icom_server is not None:
+                    self.icom_server.send(json_data.encode('utf-8'))
                 self.new_epochs_idx.append(idx)
                 self.epoched_idx.append(idx)
+                logger.debug("Epoch for '%s' was acquired and sent"%(str(self.events[idx])))
                  
         self.n_epoched = len(self.epochs)
 
