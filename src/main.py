@@ -1,5 +1,6 @@
 import os
 
+import argparse
 import socket
 import threading
 import datetime
@@ -196,6 +197,11 @@ if __name__ == "__main__":
     logger.debug("ip address: %s"%str(conf.ip_address))
     logger.debug("port: %s"%str(conf.port))
     
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mrk', type=str, default=conf.default_name_marker_stream)
+    parser.add_argument('--sig', type=str, default=conf.default_name_sig_stream)
+    args = parser.parse_args()
+    
     #conns = list()
     #thread = threading.Thread(target=server, args=(conf.ip_address, conf.port, conns))
     #thread.start()
@@ -207,8 +213,8 @@ if __name__ == "__main__":
     main(icom_server=server,
          icom_clients=conf.icom_clients,
          length_header=conf.length_header,
-         name_marker_stream = conf.name_marker_stream, 
-         name_eeg_stream = conf.name_eeg_stream,
+         name_marker_stream = args.mrk, 
+         name_eeg_stream = args.sig,
          channels = conf.channels,
          markers = conf.markers_to_epoch,
          length_buffer=conf.length_buffer,

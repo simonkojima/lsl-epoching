@@ -9,9 +9,9 @@ log_dir = os.path.join(os.path.expanduser('~'), "log", "lsl-epoching")
 data_dir = os.path.join(os.path.expanduser('~'), "Documents", "eeg", "epochs")
 data_fname = "epochs.txt"
     
-name_marker_stream = "scab-c"
+default_name_marker_stream = "scab-c"
 #name_eeg_stream = "BrainAmpSeries"
-name_eeg_stream = "jarvis-erp"
+default_name_sig_stream = "jarvis-erp"
 
 icom_clients = None
 

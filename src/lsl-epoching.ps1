@@ -1,2 +1,2 @@
 conda activate asme
-python ./main.py
+python ./main.py --mrk scab-c --sig BrainAmpSeries
