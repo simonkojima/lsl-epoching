@@ -180,20 +180,20 @@ def server(ip, port, conns):
 if __name__ == "__main__":
 
     import conf
-    log_dir = os.path.join(os.path.expanduser('~'), "log", "lsl-epoching")
 
-    log_strftime = "%y-%m-%d"
+    log_strftime = "%y-%m-%d_%H-%M-%S"
     datestr =  datetime.datetime.now().strftime(log_strftime) 
     log_fname = "%s.log"%datestr
     
-    print(log_dir)
+    mkdir(conf.log_dir)
+    #if os.path.exists(os.path.join(conf.log_dir, log_fname)):
+    #    os.remove(os.path.join(conf.log_dir, log_fname))
+    log.set_logger(os.path.join(conf.log_dir, log_fname), True)
 
-    mkdir(log_dir)
-    if os.path.exists(os.path.join(conf.log_dir, log_fname)):
-        os.remove(os.path.join(conf.log_dir, log_fname))
-    log.set_logger(os.path.join(log_dir, log_fname), True)
-    
     logger = logging.getLogger(__name__)
+    
+    logger.debug("log file will be saved in %s"%str(os.path.join(conf.log_dir, log_fname)))
+    
     logger.debug("ip address: %s"%str(conf.ip_address))
     logger.debug("port: %s"%str(conf.port))
     
@@ -202,6 +202,9 @@ if __name__ == "__main__":
     parser.add_argument('--sig', type=str, default=conf.default_name_sig_stream)
     args = parser.parse_args()
     
+    for key in vars(args).keys():
+        val = vars(args)[key]
+        logger.debug("%s: %s"%(str(key), str(val)))
     #conns = list()
     #thread = threading.Thread(target=server, args=(conf.ip_address, conf.port, conns))
     #thread.start()
