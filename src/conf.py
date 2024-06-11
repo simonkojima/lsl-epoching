@@ -1,5 +1,6 @@
 import os
 import socket
+from pylsl import proc_none, proc_clocksync, proc_dejitter, proc_monotonize, proc_threadsafe, proc_ALL
 
 ip_address = socket.gethostbyname(socket.gethostname())
 port = 49153
@@ -38,3 +39,18 @@ for m in range(1, 200):
 
 # length of the buffer in seconds
 length_buffer = 10
+
+"""
+From pylsl.py...
+
+# Post processing flags
+proc_none = 0  # No automatic post-processing; return the ground-truth time stamps for manual post-processing.
+proc_clocksync = 1  # Perform automatic clock synchronization; equivalent to manually adding the time_correction().
+proc_dejitter = 2  # Remove jitter from time stamps using a smoothing algorithm to the received time stamps.
+proc_monotonize = 4  # Force the time-stamps to be monotonically ascending. Only makes sense if timestamps are dejittered.
+proc_threadsafe = 8  # Post-processing is thread-safe (same inlet can be read from by multiple threads).
+proc_ALL = (
+    proc_none | proc_clocksync | proc_dejitter | proc_monotonize | proc_threadsafe
+)
+"""
+default_processing_flags = proc_ALL

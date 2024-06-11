@@ -14,7 +14,7 @@ import pyicom as icom
 import acquisition
 
 from utils import log
-from pylsl import StreamInlet, resolve_stream, resolve_streams
+from pylsl import StreamInlet, resolve_stream, resolve_streams, proc_ALL
 
 from utils.std import mkdir
 
@@ -63,7 +63,8 @@ def main(icom_server,
          markers_new_trial,
          markers_end_trial,
          data_dir,
-         data_fname):
+         data_fname,
+         processing_flags):
 
     logger = logging.getLogger(__name__)
     mkdir(data_dir)
@@ -79,7 +80,7 @@ def main(icom_server,
         streams = resolve_streams(wait_time = 1)
         for stream in streams:
             if stream.name() == name_eeg_stream:
-                eeg_inlet = StreamInlet(stream, recover = True)
+                eeg_inlet = StreamInlet(stream, recover = True, processing_flags = processing_flags)
                 fs = stream.nominal_srate()
                 logger.debug("EEG Stream : %s" %stream.name())
                 is_searching = False
@@ -113,32 +114,32 @@ def main(icom_server,
         streams = resolve_streams(wait_time = 1)
         for stream in streams:
             if stream.name() == name_marker_stream:
-                marker_inlet = StreamInlet(stream, recover = True)
+                marker_inlet = StreamInlet(stream, recover = True, processing_flags = processing_flags)
                 logger.debug("Marker Stream : %s" %stream.name())
                 is_searching = False
 
     logger.debug("Configuration was Done.")  
     
-    epochs = acquisition.Epochs(n_ch,
-                                fs,
-                                markers,
-                                tmin,
-                                tmax,
+    epochs = acquisition.Epochs(n_ch = n_ch,
+                                fs = fs,
+                                markers_to_epoch = markers,
+                                tmin = tmin,
+                                tmax = tmax,
                                 baseline=None,
                                 ch_names = channels,
                                 ch_types = 'eeg',
                                 file_data=file_data,
                                 icom_server=icom_server)
     
-    acq = acquisition.OnlineDataAcquire(epochs,
-                                        eeg_inlet,
-                                        channels_to_acquire,
-                                        length_buffer,
-                                        n_ch,
-                                        fs,
-                                        marker_inlet,
-                                        filter_freq,
-                                        filter_order,
+    acq = acquisition.OnlineDataAcquire(epochs = epochs,
+                                        eeg_inlet = eeg_inlet,
+                                        channels_to_acquire = channels_to_acquire,
+                                        length_buffer = length_buffer,
+                                        nch_eeg = n_ch,
+                                        fs_eeg = fs,
+                                        marker_inlet = marker_inlet,
+                                        filter_freq = filter_freq,
+                                        filter_order = filter_order,
                                         new_trial_markers = markers_new_trial,
                                         end_markers = markers_end_trial)
     
@@ -209,6 +210,9 @@ if __name__ == "__main__":
     #thread = threading.Thread(target=server, args=(conf.ip_address, conf.port, conns))
     #thread.start()
     
+    processing_flags = conf.default_processing_flags
+    logger.debug("processing_flags for lsl streams: %s"%str(processing_flags))
+    
     server = icom.server(ip = conf.ip_address,
                          port = conf.port)
     server.start()
@@ -229,4 +233,5 @@ if __name__ == "__main__":
          markers_new_trial = conf.markers['trial-start'],
          markers_end_trial = conf.markers['trial-end'],
          data_dir=conf.data_dir,
-         data_fname=conf.data_fname)
+         data_fname=conf.data_fname,
+         processing_flags=processing_flags)

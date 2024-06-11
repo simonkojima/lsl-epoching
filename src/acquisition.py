@@ -154,6 +154,7 @@ class OnlineDataAcquire(object):
 
 
                 if marker.time_chunk:
+
                     logger.debug("markers '%s' was recieved"%str(marker.data_chunk))
 
                     # append marker data and time info
@@ -186,7 +187,17 @@ class OnlineDataAcquire(object):
         
 
 class Epochs():
-    def __init__(self, n_ch, fs, markers_to_epoch, tmin, tmax, baseline=None, ch_names=None, ch_types='eeg', file_data=None, icom_server=None):
+    def __init__(self,
+                 n_ch,
+                 fs,
+                 markers_to_epoch,
+                 tmin,
+                 tmax,
+                 baseline=None,
+                 ch_names=None,
+                 ch_types='eeg',
+                 file_data=None,
+                 icom_server=None):
         """
         Parameters
         ----------
