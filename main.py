@@ -235,6 +235,6 @@ if __name__ == "__main__":
          filter_order = 2,
          markers_new_trial = config['markers']['new_trial'],
          markers_end_trial = config['markers']['end'],
-         data_dir = config['directories']['data'],
+         data_dir = os.path.join(os.path.expanduser('~'), config['directories']['data']),
          data_fname = config['filenames']['epochs'],
          processing_flags=processing_flags)
