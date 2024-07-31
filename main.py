@@ -182,8 +182,13 @@ if __name__ == "__main__":
 
     #import conf
     
-    with open("config.toml", "r") as f:
-        config = tomllib.load(f)
+    try:
+        with open("config.toml", "r") as f:
+            config = tomllib.load(f)
+    except:
+        with open("config.toml", "rb") as f:
+            config = tomllib.load(f)
+        
         
     print(config)
     home_dir = os.path.expanduser("~")
@@ -216,10 +221,11 @@ if __name__ == "__main__":
     server = icom.server(ip = args.ip,
                          port = args.port)
     server.start()
+    server.wait_for_connection()
     
     main(icom_server=server,
-         name_marker_stream = args.mrk, 
-         name_eeg_stream = args.sig,
+         name_marker_stream = args.marker, 
+         name_eeg_stream = args.signal,
          channels = config['signal']['channels'],
          markers = config['markers']['epochs'],
          length_buffer = config['signal']['length_buffer'],
