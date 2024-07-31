@@ -51,6 +51,6 @@ proc_monotonize = 4  # Force the time-stamps to be monotonically ascending. Only
 proc_threadsafe = 8  # Post-processing is thread-safe (same inlet can be read from by multiple threads).
 proc_ALL = (
     proc_none | proc_clocksync | proc_dejitter | proc_monotonize | proc_threadsafe
-)
+) -> 15
 """
 default_processing_flags = proc_ALL

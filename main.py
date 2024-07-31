@@ -18,8 +18,10 @@ from pylsl import StreamInlet, resolve_stream, resolve_streams, proc_ALL
 
 from utils.std import mkdir
 
-#def eeg_format_convert(data):
-#    return np.transpose(data)
+try:
+    import tomllib
+except:
+    import toml as tomllib
 
 def get_ch_names_LSL(inlet):
 
@@ -49,8 +51,6 @@ def conns_send(conns, data):
 
 
 def main(icom_server,
-         icom_clients,
-         length_header,
          length_buffer,
          name_marker_stream,
          name_eeg_stream,
@@ -180,58 +180,55 @@ def server(ip, port, conns):
 
 if __name__ == "__main__":
 
-    import conf
+    #import conf
+    
+    with open("config.toml", "r") as f:
+        config = tomllib.load(f)
+        
+    print(config)
+    home_dir = os.path.expanduser("~")
 
     log_strftime = "%y-%m-%d_%H-%M-%S"
     datestr =  datetime.datetime.now().strftime(log_strftime) 
     log_fname = "%s.log"%datestr
     
-    mkdir(conf.log_dir)
-    #if os.path.exists(os.path.join(conf.log_dir, log_fname)):
-    #    os.remove(os.path.join(conf.log_dir, log_fname))
-    log.set_logger(os.path.join(conf.log_dir, log_fname), True)
+    mkdir(os.path.join(home_dir, config['directories']['log']))
+    log.set_logger(os.path.join(home_dir, config['directories']['log'], log_fname), True)
 
     logger = logging.getLogger(__name__)
     
-    logger.debug("log file will be saved in %s"%str(os.path.join(conf.log_dir, log_fname)))
-    
-    logger.debug("ip address: %s"%str(conf.ip_address))
-    logger.debug("port: %s"%str(conf.port))
+    logger.debug("log file will be saved in %s"%str(os.path.join(home_dir, config['directories']['log'], log_fname)))
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mrk', type=str, default=conf.default_name_marker_stream)
-    parser.add_argument('--sig', type=str, default=conf.default_name_sig_stream)
+    parser.add_argument('--ip', type = str, default = "localhost")
+    parser.add_argument('--port', type = int, default = 49155)
+    parser.add_argument('--marker', type=str, default=config['default_stream']['marker'])
+    parser.add_argument('--signal', type=str, default=config['default_stream']['signal'])
     args = parser.parse_args()
     
     for key in vars(args).keys():
         val = vars(args)[key]
         logger.debug("%s: %s"%(str(key), str(val)))
-    #conns = list()
-    #thread = threading.Thread(target=server, args=(conf.ip_address, conf.port, conns))
-    #thread.start()
     
-    processing_flags = conf.default_processing_flags
+    processing_flags = config['lsl']['processing_flags']
     logger.debug("processing_flags for lsl streams: %s"%str(processing_flags))
     
-    server = icom.server(ip = conf.ip_address,
-                         port = conf.port)
+    server = icom.server(ip = args.ip,
+                         port = args.port)
     server.start()
     
     main(icom_server=server,
-         icom_clients=conf.icom_clients,
-         length_header=conf.length_header,
          name_marker_stream = args.mrk, 
          name_eeg_stream = args.sig,
-         channels = conf.channels,
-         markers = conf.markers_to_epoch,
-         length_buffer=conf.length_buffer,
+         channels = config['signal']['channels'],
+         markers = config['markers']['epochs'],
+         length_buffer = config['signal']['length_buffer'],
          tmin = -0.1,
          tmax = 1,
          filter_freq = [1, 40],
-         #filter_freq = None,
          filter_order = 2,
-         markers_new_trial = conf.markers['trial-start'],
-         markers_end_trial = conf.markers['trial-end'],
-         data_dir=conf.data_dir,
-         data_fname=conf.data_fname,
+         markers_new_trial = config['markers']['new_trial'],
+         markers_end_trial = config['markers']['end'],
+         data_dir = config['directories']['data'],
+         data_fname = config['filenames']['epochs'],
          processing_flags=processing_flags)
