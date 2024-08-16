@@ -161,6 +161,12 @@ class OnlineDataAcquire(object):
                     time_start = time.perf_counter()
                     marker.data = np.append(marker.data, marker.data_chunk)
                     marker.time = np.append(marker.time, marker.time_chunk)
+
+                    #I = np.where(marker.time < eeg.time[0])[0]
+                    #marker.time = np.delete(marker.time, I)
+                    #marker.data = np.delete(marker.data, I)
+                    #print(I)
+
                     time_end = time.perf_counter()
                     
                     self.epochs.update()
@@ -287,6 +293,7 @@ class Epochs():
         #self.n_markers = len(self.marker.time)
 
         # check if the marker can be epoched
+        idx_to_delete = list()
         for idx, time_marker in enumerate(self.marker.time):
             if (self.eeg.time[-1] > (time_marker + self.tmax + 5/self.fs)) and ((idx in self.epoched_idx) is False):
                 idx_start = int(np.argmin(np.absolute(self.eeg.time - (time_marker + self.tmin))))
@@ -303,6 +310,12 @@ class Epochs():
                 self.new_epochs_idx.append(idx)
                 self.epoched_idx.append(idx)
                 logger.debug("Epoch for '%s' was acquired and sent"%(str(self.events[idx])))
+                self.events[idx] = None
+                self.epochs[idx] = None
+
+                idx_to_delete += idx 
+        self.marker.time = np.delete(self.marker.time, idx_to_delete)
+        self.marker.data = np.delete(self.marker.data, idx_to_delete)
                  
         self.n_epoched = len(self.epochs)
 

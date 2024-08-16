@@ -219,7 +219,8 @@ if __name__ == "__main__":
     logger.debug("processing_flags for lsl streams: %s"%str(processing_flags))
     
     server = icom.server(ip = args.ip,
-                         port = args.port)
+                         port = args.port,
+                         timeout=None)
     server.start()
     server.wait_for_connection()
     

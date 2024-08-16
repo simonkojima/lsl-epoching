@@ -17,12 +17,11 @@ import pyicom as icom
 #header = 64
 #FORMAT = ''
 
-ip = socket.gethostbyname(socket.gethostname())
+ip = "localhost"
 port = 49153
 
 client = icom.client(ip = ip,
-                     port = port,
-                     name = "epoching-test")
+                     port = port)
 client.connect()
 #cl = socket.socket(socket.AF_INET)
 #cl.connect((IPADDR, PORT))
@@ -34,12 +33,14 @@ epochs = list()
 events = list()
 
 json_save = dict()
+cnt = 0
 while True:
     #input("Press Any Keys to Start.")
 
     try:
         data = client.recv()
-        print(json.loads(data.decode('utf-8')).keys())
+        cnt += 1
+        print("%d: data received"%cnt)
     except:
         print(traceback.format_exc())
         break
