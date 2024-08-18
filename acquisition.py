@@ -8,6 +8,12 @@ from logging import getLogger
 import numpy as np
 from scipy import signal
 
+def pop_list_indexes(list, indexes_to_remove):
+    list = copy.copy(list)
+    indexes_to_remove = copy.copy(indexes_to_remove)
+    for index in sorted(indexes_to_remove, reverse=True):
+        list.pop(index)
+    return list
 
 class DataStruct:
     data = np.array([])
@@ -30,9 +36,9 @@ class OnlineDataAcquire(object):
             filter_freq=None,
             filter_order=None,
             format_convert_eeg_func=None,
-            format_convert_marker_func=None,
-            new_trial_markers=None,
-            end_markers=None):
+            format_convert_marker_func=None):
+            #new_trial_markers=None,
+            #end_markers=None):
 
         logger = getLogger(__name__)
         self.epochs = epochs
@@ -52,19 +58,19 @@ class OnlineDataAcquire(object):
         if type(channels_to_acquire) == list:
             self.channels_to_acquire = np.array(self.channels_to_acquire)
 
-        self.new_trial_markers = new_trial_markers
-        if type(new_trial_markers) == int:
-            self.new_trial_markers = list(self.new_trial_markers)
+        #self.new_trial_markers = new_trial_markers
+        #if type(new_trial_markers) == int:
+        #    self.new_trial_markers = list(self.new_trial_markers)
 
-        self.end_markers = end_markers
-        if type(self.end_markers) == int:
-            self.end_markers = list(self.end_markers)
+        #self.end_markers = end_markers
+        #if type(self.end_markers) == int:
+        #    self.end_markers = list(self.end_markers)
 
         self.is_running = False
 
-        self.got_new_trial_marker = False
-        self.got_end_marker = False
-        self.trial_was_end = False
+        #self.got_new_trial_marker = False
+        #self.got_end_marker = False
+        #self.trial_was_end = False
 
         logger.debug("Online Data Aquire module was initialized.")
 
@@ -111,8 +117,8 @@ class OnlineDataAcquire(object):
                 try:
                     eeg.data_chunk, eeg.time_chunk = self.eeg_inlet.pull_chunk()
                     marker.data_chunk, marker.time_chunk = self.marker_inlet.pull_chunk()
-                    eeg.time_correction = self.eeg_inlet.time_correction()
-                    marker.time_correction = self.marker_inlet.time_correction()
+                    #eeg.time_correction = self.eeg_inlet.time_correction()
+                    #marker.time_correction = self.marker_inlet.time_correction()
                 except Exception as e:
                     from pylsl.pylsl import LostError
                     if type(e) == LostError:
@@ -162,19 +168,22 @@ class OnlineDataAcquire(object):
                     marker.data = np.append(marker.data, marker.data_chunk)
                     marker.time = np.append(marker.time, marker.time_chunk)
 
-                    #I = np.where(marker.time < eeg.time[0])[0]
-                    #marker.time = np.delete(marker.time, I)
-                    #marker.data = np.delete(marker.data, I)
-                    #print(I)
+                    I = np.where(marker.time < eeg.time[0])[0]
+                    if len(I) > 0:
+                        marker.time = np.delete(marker.time, I)
+                        marker.data = np.delete(marker.data, I)
+                    #logger.debug("I: %s"%str(I))
+                    #logger.debug("marker.data: %s"%str(marker.data))
 
                     time_end = time.perf_counter()
                     
-                    self.epochs.update()
+                    self.epochs.update(marker_data_chunk = marker.data_chunk, marker_time_chunk = marker.time_chunk)
         except:
             logger.error("Error : \n%s" %(traceback.format_exc()))
 
         logger.debug("stop receiving data.")
 
+    """
     def get_marker_data(self):
         return self.marker
 
@@ -190,6 +199,7 @@ class OnlineDataAcquire(object):
             return marker
         else:
             return False
+    """
         
 
 class Epochs():
@@ -199,6 +209,8 @@ class Epochs():
                  markers_to_epoch,
                  tmin,
                  tmax,
+                 callback,
+                 data_callback = None,
                  baseline=None,
                  ch_names=None,
                  ch_types='eeg',
@@ -217,11 +229,33 @@ class Epochs():
         self.markers_to_epoch = markers_to_epoch
         self.tmin = tmin
         self.tmax = tmax
-        #range_epoch = [tmin, tmax]
-        self.range_epoch = [tmin, tmax]
+        self.callback = callback
+        self.data_callback = data_callback
         self.baseline = baseline
+        self.file_data = file_data
+        self.icom_server = icom_server
+
+        #self.range_epoch = [tmin, tmax]
         self.data = None
         self.events = None
+
+        self.length_epoch = np.floor(fs*(self.tmax-self.tmin)).astype(np.int64)+1
+        
+        self.eeg = None
+        self.marker = None
+        
+        self.events_list = list()
+        self.time_list = list()
+        
+        self.epoched_time_list = list()
+
+        self.epochs = dict()
+        self.events = dict()
+
+        if self.baseline is not None:
+            raise ValueError("baseline correction is not currently implemented. set baseline = None")
+    
+        """
         self.ch_types = ch_types
         if ch_names == None:
             self.ch_names = list()
@@ -230,24 +264,20 @@ class Epochs():
         else:
             self.ch_names = ch_names
         #self.info = mne.create_info(self.ch_names, self.fs, ch_types=self.ch_types)
+        """
         
-        self.file_data = file_data
-        self.icom_server = icom_server
-
-        self.length_epoch = np.floor(fs*(self.range_epoch[1]-self.range_epoch[0])).astype(np.int64)+1
         
-        self.eeg = None
-        self.marker = None
-
-        self.epochs = dict()
-        self.events = dict()
+        """
         self.n_markers = None # total markers in trial
         self.n_epoched = None # total epochs acquired
+        """
 
         #self.event_epoching = list() # event and time_sample for epoching.
         
+        """
         self.new_epochs_idx = list()
         self.epoched_idx = list()
+        """
         
         #self.epoched_marker = list()
 
@@ -260,6 +290,7 @@ class Epochs():
         
         #self.epoched_marker = np.zeros((len(marker.data)), dtype=np.int64)
 
+    """
     def clear(self):
         self.epochs = dict()
         self.events = dict()
@@ -269,8 +300,9 @@ class Epochs():
         
         self.new_epochs_idx = list()
         self.epoched_idx = list()
+    """
 
-    def update(self):
+    def update(self, marker_data_chunk = None, marker_time_chunk = None):
 
         logger = getLogger(__name__)
         #time.sleep(0.1)
@@ -281,6 +313,18 @@ class Epochs():
         #    return
         
         # check if the marker is in the self.markers_to_epoch
+        if marker_data_chunk is not None and marker_time_chunk is not None:
+            for data, time_marker in zip(np.array(marker_data_chunk), np.array(marker_time_chunk)):
+                # data in self.markers_to_epoch: check if the marker is needed to be epoched
+                # time_marker > self.time_list[-1]: check if the marker is latest (updated in OnlineDataAcquire). Other wise, the already epoched marker will be added
+                if data in self.markers_to_epoch:
+                        self.events_list.append(data[0])
+                        self.time_list.append(time_marker)
+            #logger.debug("self.events_list: %s"%str(self.events_list))
+            #logger.debug("self.time_list: %s"%str(self.time_list))
+        
+
+        """
         idx_to_delete = list()
         for idx, val in enumerate(np.unique(self.marker.data)):
             if (val in self.markers_to_epoch) is False:
@@ -289,9 +333,45 @@ class Epochs():
                     idx_to_delete += i.tolist()
         self.marker.data = np.delete(self.marker.data, idx_to_delete)
         self.marker.time = np.delete(self.marker.time, idx_to_delete)
+        """
         
         #self.n_markers = len(self.marker.time)
+        
+        # epoching
+        
+        #logger.debug("self.time_list: %s"%(str(self.time_list)))
+        idx_to_delete = list()
+        for idx, (time_marker, events) in enumerate(zip(self.time_list, self.events_list)):
+            if (self.eeg.time[-1] > (time_marker + self.tmax + 5/self.fs)):
+                idx_start = int(np.argmin(np.absolute(self.eeg.time - (time_marker + self.tmin))))
+                idx_end = int(idx_start + self.length_epoch)
 
+                diff = np.min(np.absolute(self.eeg.time - (time_marker + self.tmin)))
+                if diff > (10/self.fs):
+                    logger.error("Marker: %s, Difference between eeg and marker is %.5f sec. There may be synchronization error."%(str(events), diff))
+
+                epochs = self.eeg.data[:, idx_start:idx_end]
+                
+                self.callback(epochs = epochs, events = events, data = self.data_callback)
+                logger.debug("Epoch for '%s' was acquired"%(str(events)))
+                
+                idx_to_delete.append(idx)
+        #self.time_list = np.delete(self.marker.time, idx_to_delete)
+        #self.marker.data = np.delete(self.marker.data, idx_to_delete)
+        if len(idx_to_delete) > 0:
+            #logger.debug("self.events_list: %s"%(str(self.events_list)))
+            #logger.debug("idx_to_delete: %s"%(str(idx_to_delete)))
+            self.time_list = pop_list_indexes(self.time_list, idx_to_delete)
+            self.events_list = pop_list_indexes(self.events_list, idx_to_delete)
+            #logger.debug("self.events_list (after): %s"%(str(self.events_list)))
+
+                
+                
+        
+            
+        
+
+        """
         # check if the marker can be epoched
         idx_to_delete = list()
         for idx, time_marker in enumerate(self.marker.time):
@@ -313,12 +393,14 @@ class Epochs():
                 self.events[idx] = None
                 self.epochs[idx] = None
 
-                idx_to_delete += idx 
-        self.marker.time = np.delete(self.marker.time, idx_to_delete)
-        self.marker.data = np.delete(self.marker.data, idx_to_delete)
+                #idx_to_delete += idx 
+        #self.marker.time = np.delete(self.marker.time, idx_to_delete)
+        #self.marker.data = np.delete(self.marker.data, idx_to_delete)
                  
         self.n_epoched = len(self.epochs)
+        """
 
+    """
     def get_data(self):
         if len(self.epochs) == 0:
             return None
@@ -350,3 +432,4 @@ class Epochs():
                 self.new_epochs_idx.remove(idx_epochs)
 
             return epochs_new, events_new
+    """

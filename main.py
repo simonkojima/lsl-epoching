@@ -1,11 +1,16 @@
 import os
 
+import copy
 import argparse
 import socket
 import threading
+import multiprocessing
 import datetime
 import logging
-import json
+
+#import json
+#import pickle
+import msgpack
 
 import numpy as np
 
@@ -22,6 +27,25 @@ try:
     import tomllib
 except:
     import toml as tomllib
+    
+def process_send_json(data, icom):
+    json_data = json.dumps(data)
+    icom.send(json_data.encode('utf-8'))
+    logger.debug("sent over icom")
+    
+def callback_epoching(epochs, events, data):
+    logger = logging.getLogger(__name__)
+    events = copy.copy(events)
+    epochs = copy.copy(epochs)
+    dict_data = {'type':'epochs', 'events':events.tolist(), 'epochs':epochs.tolist()}
+    #thread = threading.Thread(target = process_send_json, kwargs = {"data":dict_data, "icom":data["icom"]})
+    #thread.start()
+    
+    data_serial = msgpack.packb(dict_data)
+    data['icom'].send(data_serial)
+
+    #data["icom"].send(json_data.encode('utf-8'))
+    logger.debug("epochs for '%s' were sent over icom"%(str(events)))
 
 def get_ch_names_LSL(inlet):
 
@@ -60,8 +84,10 @@ def main(icom_server,
          tmax,
          filter_freq,
          filter_order,
-         markers_new_trial,
-         markers_end_trial,
+         #markers_new_trial,
+         #markers_end_trial,
+         callback,
+         data_callback,
          data_dir,
          data_fname,
          processing_flags):
@@ -125,6 +151,8 @@ def main(icom_server,
                                 markers_to_epoch = markers,
                                 tmin = tmin,
                                 tmax = tmax,
+                                callback = callback,
+                                data_callback = data_callback,
                                 baseline=None,
                                 ch_names = channels,
                                 ch_types = 'eeg',
@@ -139,9 +167,9 @@ def main(icom_server,
                                         fs_eeg = fs,
                                         marker_inlet = marker_inlet,
                                         filter_freq = filter_freq,
-                                        filter_order = filter_order,
-                                        new_trial_markers = markers_new_trial,
-                                        end_markers = markers_end_trial)
+                                        filter_order = filter_order)
+                                        #new_trial_markers = markers_new_trial,
+                                        #end_markers = markers_end_trial)
     
     acq.start()
     
@@ -223,6 +251,8 @@ if __name__ == "__main__":
                          timeout=None)
     server.start()
     server.wait_for_connection()
+
+    data_callback = {"icom": server}
     
     main(icom_server=server,
          name_marker_stream = args.marker, 
@@ -234,8 +264,10 @@ if __name__ == "__main__":
          tmax = 1,
          filter_freq = [1, 40],
          filter_order = 2,
-         markers_new_trial = config['markers']['new_trial'],
-         markers_end_trial = config['markers']['end'],
+         callback = callback_epoching,
+         data_callback = data_callback,
+         #markers_new_trial = config['markers']['new_trial'],
+         #markers_end_trial = config['markers']['end'],
          data_dir = os.path.join(os.path.expanduser('~'), config['directories']['data']),
          data_fname = config['filenames']['epochs'],
          processing_flags=processing_flags)

@@ -4,6 +4,7 @@ import traceback
 
 import socket
 import json
+import msgpack
 
 import pyicom as icom
 
@@ -40,7 +41,8 @@ while True:
     try:
         data = client.recv()
         cnt += 1
-        print("%d: data received"%cnt)
+        data = msgpack.unpackb(data)
+        print("%d: data received"%(cnt))
     except:
         print(traceback.format_exc())
         break
