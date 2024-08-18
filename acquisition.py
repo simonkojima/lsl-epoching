@@ -37,8 +37,6 @@ class OnlineDataAcquire(object):
             filter_order=None,
             format_convert_eeg_func=None,
             format_convert_marker_func=None):
-            #new_trial_markers=None,
-            #end_markers=None):
 
         logger = getLogger(__name__)
         self.epochs = epochs
@@ -58,19 +56,7 @@ class OnlineDataAcquire(object):
         if type(channels_to_acquire) == list:
             self.channels_to_acquire = np.array(self.channels_to_acquire)
 
-        #self.new_trial_markers = new_trial_markers
-        #if type(new_trial_markers) == int:
-        #    self.new_trial_markers = list(self.new_trial_markers)
-
-        #self.end_markers = end_markers
-        #if type(self.end_markers) == int:
-        #    self.end_markers = list(self.end_markers)
-
         self.is_running = False
-
-        #self.got_new_trial_marker = False
-        #self.got_end_marker = False
-        #self.trial_was_end = False
 
         logger.debug("Online Data Aquire module was initialized.")
 
@@ -182,24 +168,6 @@ class OnlineDataAcquire(object):
             logger.error("Error : \n%s" %(traceback.format_exc()))
 
         logger.debug("stop receiving data.")
-
-    """
-    def get_marker_data(self):
-        return self.marker
-
-    def is_trial_end(self):
-        if self.trial_was_end:
-            self.trial_was_end = False
-            return True
-
-    def is_got_new_trial_marker(self):
-        if self.got_new_trial_marker != False:
-            marker = self.got_new_trial_marker
-            self.got_new_trial_marker = False
-            return marker
-        else:
-            return False
-    """
         
 
 class Epochs():
@@ -235,7 +203,6 @@ class Epochs():
         self.file_data = file_data
         self.icom_server = icom_server
 
-        #self.range_epoch = [tmin, tmax]
         self.data = None
         self.events = None
 
@@ -254,63 +221,15 @@ class Epochs():
 
         if self.baseline is not None:
             raise ValueError("baseline correction is not currently implemented. set baseline = None")
-    
-        """
-        self.ch_types = ch_types
-        if ch_names == None:
-            self.ch_names = list()
-            for m in range(n_ch):
-                self.ch_names.append("ch" + str(m+1))
-        else:
-            self.ch_names = ch_names
-        #self.info = mne.create_info(self.ch_names, self.fs, ch_types=self.ch_types)
-        """
-        
-        
-        """
-        self.n_markers = None # total markers in trial
-        self.n_epoched = None # total epochs acquired
-        """
-
-        #self.event_epoching = list() # event and time_sample for epoching.
-        
-        """
-        self.new_epochs_idx = list()
-        self.epoched_idx = list()
-        """
-        
-        #self.epoched_marker = list()
-
-        #self.new_data = np.array([], dtype=np.int64)
 
 
     def set(self, eeg, marker):
         self.eeg = eeg
         self.marker = marker
-        
-        #self.epoched_marker = np.zeros((len(marker.data)), dtype=np.int64)
-
-    """
-    def clear(self):
-        self.epochs = dict()
-        self.events = dict()
-
-        self.n_markers = None
-        self.n_epoched = None
-        
-        self.new_epochs_idx = list()
-        self.epoched_idx = list()
-    """
 
     def update(self, marker_data_chunk = None, marker_time_chunk = None):
 
         logger = getLogger(__name__)
-        #time.sleep(0.1)
-
-        #if self.marker.data.size == 0:
-            # doesn't have any marker sometimes when it's updated with new eeg data
-            # don't process if there's no markers received.
-        #    return
         
         # check if the marker is in the self.markers_to_epoch
         if marker_data_chunk is not None and marker_time_chunk is not None:
@@ -323,19 +242,6 @@ class Epochs():
             #logger.debug("self.events_list: %s"%str(self.events_list))
             #logger.debug("self.time_list: %s"%str(self.time_list))
         
-
-        """
-        idx_to_delete = list()
-        for idx, val in enumerate(np.unique(self.marker.data)):
-            if (val in self.markers_to_epoch) is False:
-                I = np.where(self.marker.data == val)
-                for i in I:
-                    idx_to_delete += i.tolist()
-        self.marker.data = np.delete(self.marker.data, idx_to_delete)
-        self.marker.time = np.delete(self.marker.time, idx_to_delete)
-        """
-        
-        #self.n_markers = len(self.marker.time)
         
         # epoching
         
@@ -356,80 +262,10 @@ class Epochs():
                 logger.debug("Epoch for '%s' was acquired"%(str(events)))
                 
                 idx_to_delete.append(idx)
-        #self.time_list = np.delete(self.marker.time, idx_to_delete)
-        #self.marker.data = np.delete(self.marker.data, idx_to_delete)
+
         if len(idx_to_delete) > 0:
             #logger.debug("self.events_list: %s"%(str(self.events_list)))
             #logger.debug("idx_to_delete: %s"%(str(idx_to_delete)))
             self.time_list = pop_list_indexes(self.time_list, idx_to_delete)
             self.events_list = pop_list_indexes(self.events_list, idx_to_delete)
             #logger.debug("self.events_list (after): %s"%(str(self.events_list)))
-
-                
-                
-        
-            
-        
-
-        """
-        # check if the marker can be epoched
-        idx_to_delete = list()
-        for idx, time_marker in enumerate(self.marker.time):
-            if (self.eeg.time[-1] > (time_marker + self.tmax + 5/self.fs)) and ((idx in self.epoched_idx) is False):
-                idx_start = int(np.argmin(np.absolute(self.eeg.time - (time_marker + self.tmin))))
-                idx_end = int(idx_start + self.length_epoch)
-                #if (idx_end - idx_start) != self.length_epoch:
-                #    raise ValueError("length_epoch is invalid")
-                self.epochs[idx] = self.eeg.data[:, idx_start:idx_end]
-                self.events[idx] = self.marker.data[idx]
-                json_data = json.dumps({'type':'epochs', 'events':self.events[idx].tolist(), 'epochs':self.epochs[idx].tolist()})
-                if self.file_data is not None:
-                    self.file_data.write(json_data)
-                if self.icom_server is not None:
-                    self.icom_server.send(json_data.encode('utf-8'))
-                self.new_epochs_idx.append(idx)
-                self.epoched_idx.append(idx)
-                logger.debug("Epoch for '%s' was acquired and sent"%(str(self.events[idx])))
-                self.events[idx] = None
-                self.epochs[idx] = None
-
-                #idx_to_delete += idx 
-        #self.marker.time = np.delete(self.marker.time, idx_to_delete)
-        #self.marker.data = np.delete(self.marker.data, idx_to_delete)
-                 
-        self.n_epoched = len(self.epochs)
-        """
-
-    """
-    def get_data(self):
-        if len(self.epochs) == 0:
-            return None
-        else:
-            return self.epochs
-    
-    def has_new_data(self):
-        if len(self.new_epochs_idx) == 0:
-            return False
-        else:
-            return True
-    
-    def get_new_data(self):
-        if self.has_new_data() == False:
-            return None
-        else:
-            
-            # sometimes, new epoch is recorded, and self.new_epochs_idx have new index data
-            # in for loop below. To prevent this, copy the object.
-            new_epochs_idx = copy.copy(self.new_epochs_idx)
-
-            events_new = list()
-            epochs_new = np.zeros((len(new_epochs_idx), self.n_ch, self.length_epoch))
-            for idx, idx_epochs in enumerate(new_epochs_idx):
-                epochs_new[idx, :, :] = self.epochs[idx_epochs]
-                events_new.append(self.events[idx_epochs])
-            
-            for idx_epochs in new_epochs_idx:
-                self.new_epochs_idx.remove(idx_epochs)
-
-            return epochs_new, events_new
-    """
