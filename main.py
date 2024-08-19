@@ -25,70 +25,15 @@ def pop_list_indexes(list, indexes_to_remove):
     for index in sorted(indexes_to_remove, reverse=True):
         list.pop(index)
     return list
-
-class IcomBuffer():
-    def __init__(self, icom):
-        self.icom = icom
-        self.data = list()
-        self.len_data = 0
-        self.len_sent_data = 0
-        self.idx = 0
-        self.is_running = False
-    
-    def add_buffer(self, data):
-        self.data.append(data)
-        self.len_data += 1
-    
-    def start(self):
-        logger = logging.getLogger(__name__)
-        logger.debug("icom buffer started")
-        self.is_running = True
-        #self.thread = threading.Thread(target=self.thread)
-        self.thread = threading.Thread(target=self.thread_each)
-        self.thread.start()
-    
-    def thread_each(self):
-        logger = logging.getLogger(__name__)
-        try:
-            while self.is_running:
-                if self.len_data > self.len_sent_data:
-                    self.icom.send(msgpack.packb(self.data[self.idx]))
-                    self.idx += 1
-                    self.len_sent_data += 1
-                    logger.debug("%s: data was sent"%(str(self.len_sent_data)))
-        except:
-            logger.error("Error : \n%s" %(traceback.format_exc()))
-    
-    def thread_cat(self):
-        logger = logging.getLogger(__name__)
-        try:
-            while self.is_running:
-                len_data = len(self.data)
-                if len_data > 0:
-                    self.icom.send(msgpack.packb(self.data[0:len_data]))
-                    pop_list_indexes(self.data, list(range(len_data)))
-        except:
-            logger.error("Error : \n%s" %(traceback.format_exc()))
     
 def callback_epoching(epochs, events, data):
     logger = logging.getLogger(__name__)
     logger.debug("callback_epoching was called for '%s'"%(str(events)))
-    #events = copy.copy(events)
-    #epochs = copy.copy(epochs)
     dict_data = {'type':'epochs', 'events':events.tolist(), 'epochs':epochs.tolist()}
     
-    #data['icom'].add_buffer(dict_data)
-    
-
-    #thread = threading.Thread(target = process_send_json, kwargs = {"data":dict_data, "icom":data["icom"]})
-    #thread.start()
     
     data_serial = msgpack.packb(dict_data)
     data['icom'].send(data_serial)
-
-
-    #data["icom"].send(json_data.encode('utf-8'))
-    #logger.debug("epochs for '%s' were sent over icom"%(str(events)))
 
 def get_ch_names_LSL(inlet):
 
