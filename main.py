@@ -1,26 +1,17 @@
 import os
-
 import copy
 import argparse
-import socket
 import threading
-import multiprocessing
 import datetime
 import logging
-
-#import json
-#import pickle
+import time
+import traceback
 import msgpack
-
 import numpy as np
-
 import pyicom as icom
-
 import acquisition
-
 from utils import log
 from pylsl import StreamInlet, resolve_stream, resolve_streams, proc_ALL
-
 from utils.std import mkdir
 
 try:
@@ -28,24 +19,76 @@ try:
 except:
     import toml as tomllib
     
-def process_send_json(data, icom):
-    json_data = json.dumps(data)
-    icom.send(json_data.encode('utf-8'))
-    logger.debug("sent over icom")
+def pop_list_indexes(list, indexes_to_remove):
+    list = copy.copy(list)
+    indexes_to_remove = copy.copy(indexes_to_remove)
+    for index in sorted(indexes_to_remove, reverse=True):
+        list.pop(index)
+    return list
+
+class IcomBuffer():
+    def __init__(self, icom):
+        self.icom = icom
+        self.data = list()
+        self.len_data = 0
+        self.len_sent_data = 0
+        self.idx = 0
+        self.is_running = False
+    
+    def add_buffer(self, data):
+        self.data.append(data)
+        self.len_data += 1
+    
+    def start(self):
+        logger = logging.getLogger(__name__)
+        logger.debug("icom buffer started")
+        self.is_running = True
+        #self.thread = threading.Thread(target=self.thread)
+        self.thread = threading.Thread(target=self.thread_each)
+        self.thread.start()
+    
+    def thread_each(self):
+        logger = logging.getLogger(__name__)
+        try:
+            while self.is_running:
+                if self.len_data > self.len_sent_data:
+                    self.icom.send(msgpack.packb(self.data[self.idx]))
+                    self.idx += 1
+                    self.len_sent_data += 1
+                    logger.debug("%s: data was sent"%(str(self.len_sent_data)))
+        except:
+            logger.error("Error : \n%s" %(traceback.format_exc()))
+    
+    def thread_cat(self):
+        logger = logging.getLogger(__name__)
+        try:
+            while self.is_running:
+                len_data = len(self.data)
+                if len_data > 0:
+                    self.icom.send(msgpack.packb(self.data[0:len_data]))
+                    pop_list_indexes(self.data, list(range(len_data)))
+        except:
+            logger.error("Error : \n%s" %(traceback.format_exc()))
     
 def callback_epoching(epochs, events, data):
     logger = logging.getLogger(__name__)
-    events = copy.copy(events)
-    epochs = copy.copy(epochs)
+    logger.debug("callback_epoching was called for '%s'"%(str(events)))
+    #events = copy.copy(events)
+    #epochs = copy.copy(epochs)
     dict_data = {'type':'epochs', 'events':events.tolist(), 'epochs':epochs.tolist()}
+    
+    #data['icom'].add_buffer(dict_data)
+    
+
     #thread = threading.Thread(target = process_send_json, kwargs = {"data":dict_data, "icom":data["icom"]})
     #thread.start()
     
     data_serial = msgpack.packb(dict_data)
     data['icom'].send(data_serial)
 
+
     #data["icom"].send(json_data.encode('utf-8'))
-    logger.debug("epochs for '%s' were sent over icom"%(str(events)))
+    #logger.debug("epochs for '%s' were sent over icom"%(str(events)))
 
 def get_ch_names_LSL(inlet):
 
@@ -92,9 +135,15 @@ def main(icom_server,
          #data_fname,
          processing_flags):
 
+    
+    try:
+        with open("config.toml", "r") as f:
+            config = tomllib.load(f)
+    except:
+        with open("config.toml", "rb") as f:
+            config = tomllib.load(f)
+
     logger = logging.getLogger(__name__)
-    #mkdir(data_dir)
-    #file_data = open(os.path.join(data_dir, data_fname), 'w')
 
     logger.debug("channels for acquisition: %s"%str(channels))
 
@@ -106,7 +155,11 @@ def main(icom_server,
         streams = resolve_streams(wait_time = 1)
         for stream in streams:
             if stream.name() == name_eeg_stream:
-                eeg_inlet = StreamInlet(stream, recover = True, processing_flags = processing_flags)
+                eeg_inlet = StreamInlet(stream, 
+                                        max_buflen = 10,
+                                        max_chunklen = 1,
+                                        recover = True,
+                                        processing_flags = processing_flags)
                 fs = stream.nominal_srate()
                 logger.debug("EEG Stream : %s" %stream.name())
                 is_searching = False
@@ -140,9 +193,20 @@ def main(icom_server,
         streams = resolve_streams(wait_time = 1)
         for stream in streams:
             if stream.name() == name_marker_stream:
-                marker_inlet = StreamInlet(stream, recover = True, processing_flags = processing_flags)
+                marker_inlet = StreamInlet(stream,
+                                           max_buflen = 10,
+                                           max_chunklen = 1,
+                                           recover = True,
+                                           processing_flags = processing_flags)
                 logger.debug("Marker Stream : %s" %stream.name())
                 is_searching = False
+
+    """
+    while True:
+        data_chunk, time_chunk = marker_inlet.pull_chunk(timeout = 0.0)
+        t = time.time()
+        print("t, data: %s"%(str(t)))
+    """
 
     logger.debug("Configuration was Done.")  
     
@@ -170,21 +234,21 @@ def main(icom_server,
                                         filter_order = filter_order)
                                         #new_trial_markers = markers_new_trial,
                                         #end_markers = markers_end_trial)
-    
+ 
+
     acq.start()
+    #time.sleep(config['pause']['between_acq_epochs'])
+    #epochs.start()
     
-    import time
+    pause = config['pause']['main_loop']
     while True:
-        time.sleep(1)
+        time.sleep(pause)
+        """
         try:
-            pass
+            time.sleep(0.01)
         except KeyboardInterrupt:
             break
-        #json_data = dict()
-        #@json_data['type'] = 'info'
-        #json_data['info'] = 'trial-start'
-        #json_data['data'] = marker_new_trial
-        #server.send(data = json.dumps(json_data).encode('utf-8'))
+        """
         
     #file_data.close()
     print("terminate")
@@ -253,6 +317,10 @@ if __name__ == "__main__":
     server.start()
     server.wait_for_connection()
 
+    #icom_buffer = IcomBuffer(server)
+    #icom_buffer.start()
+
+    #data_callback = {"icom": icom_buffer}
     data_callback = {"icom": server}
     
     main(icom_server=server,

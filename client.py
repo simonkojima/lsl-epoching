@@ -41,7 +41,7 @@ while True:
     try:
         data = client.recv()
         cnt += 1
-        data = msgpack.unpackb(data)
+        #data = msgpack.unpackb(data)
         print("%d: data received"%(cnt))
     except:
         print(traceback.format_exc())
