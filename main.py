@@ -3,6 +3,7 @@ import copy
 import argparse
 import threading
 import datetime
+import multiprocessing
 import logging
 import time
 import traceback
@@ -26,14 +27,22 @@ def pop_list_indexes(list, indexes_to_remove):
         list.pop(index)
     return list
     
-def callback_epoching(epochs, events, data):
-    logger = logging.getLogger(__name__)
-    logger.debug("callback_epoching was called for '%s'"%(str(events)))
+def pack_and_send(icom, epochs, events):
     dict_data = {'type':'epochs', 'events':events.tolist(), 'epochs':epochs.tolist()}
+    icom.send(msgpack.packb(dict_data))
+
+def callback_epoching(epochs, events, data):
+    """
+    proc = multiprocessing.Process(target = pack_and_send,
+                                   kwargs = {"icom":data["icom"],
+                                             "epochs": epochs,
+                                             "events": events})
+    proc.start()
+    """
+    data['icom'].send(msgpack.packb({'type':'epochs', 'events':events.tolist(), 'epochs':epochs.tolist()}))
+    #logger = logging.getLogger(__name__)
+    #logger.debug("callback_epoching was called for '%s'"%(str(events)))
     
-    
-    data_serial = msgpack.packb(dict_data)
-    data['icom'].send(data_serial)
 
 def get_ch_names_LSL(inlet):
 
