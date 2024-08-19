@@ -88,13 +88,13 @@ def main(icom_server,
          #markers_end_trial,
          callback,
          data_callback,
-         data_dir,
-         data_fname,
+         #data_dir,
+         #data_fname,
          processing_flags):
 
     logger = logging.getLogger(__name__)
-    mkdir(data_dir)
-    file_data = open(os.path.join(data_dir, data_fname), 'w')
+    #mkdir(data_dir)
+    #file_data = open(os.path.join(data_dir, data_fname), 'w')
 
     logger.debug("channels for acquisition: %s"%str(channels))
 
@@ -156,7 +156,7 @@ def main(icom_server,
                                 baseline=None,
                                 ch_names = channels,
                                 ch_types = 'eeg',
-                                file_data=file_data,
+                                #file_data=file_data,
                                 icom_server=icom_server)
     
     acq = acquisition.OnlineDataAcquire(epochs = epochs,
@@ -185,7 +185,8 @@ def main(icom_server,
         #json_data['info'] = 'trial-start'
         #json_data['data'] = marker_new_trial
         #server.send(data = json.dumps(json_data).encode('utf-8'))
-    file_data.close()
+        
+    #file_data.close()
     print("terminate")
     
 """
@@ -268,6 +269,6 @@ if __name__ == "__main__":
          data_callback = data_callback,
          #markers_new_trial = config['markers']['new_trial'],
          #markers_end_trial = config['markers']['end'],
-         data_dir = os.path.join(os.path.expanduser('~'), config['directories']['data']),
-         data_fname = config['filenames']['epochs'],
+         #data_dir = os.path.join(os.path.expanduser('~'), config['directories']['data']),
+         #data_fname = config['filenames']['epochs'],
          processing_flags=processing_flags)

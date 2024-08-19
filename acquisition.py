@@ -182,7 +182,7 @@ class Epochs():
                  baseline=None,
                  ch_names=None,
                  ch_types='eeg',
-                 file_data=None,
+                 #file_data=None,
                  icom_server=None):
         """
         Parameters
@@ -200,7 +200,7 @@ class Epochs():
         self.callback = callback
         self.data_callback = data_callback
         self.baseline = baseline
-        self.file_data = file_data
+        #self.file_data = file_data
         self.icom_server = icom_server
 
         self.data = None
