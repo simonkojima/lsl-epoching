@@ -238,6 +238,9 @@ class Epochs():
 
                 idx_start = int(np.argmin(abs))
                 idx_end = int(idx_start + self.length_epoch)
+                
+                if self.eeg.data.shape[1] < idx_end:
+                    break
 
                 diff = np.min(abs)
                 if diff > (10/self.fs):
