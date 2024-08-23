@@ -240,6 +240,7 @@ class Epochs():
                 idx_end = int(idx_start + self.length_epoch)
                 
                 if self.eeg.data.shape[1] < idx_end:
+                    logger.error("time sample was satisfied, however length of data was not. (time_marker: %s, events: %s, eeg_time[-1]: %s)"%(str(time_marker), str(events), str(self.eeg.time[-1])))
                     break
 
                 diff = np.min(abs)
